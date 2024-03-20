@@ -65,9 +65,7 @@ node('vagrant') {
             stage('Apply Parameters') {
                 if (isReleaseBuild()) {
                     echo 'update dependencies for release build'
-                    docker.image('groovy:3.0.9-jdk11').inside {
-                        sh "groovy build/release.groovy ${releaseVersion}"
-                    }
+                    sh 'echo "This has been released" >> Dockerfile'
 
                     sh 'git add Dockerfile dogu.json'
                     commit "Release version ${releaseVersion}"
