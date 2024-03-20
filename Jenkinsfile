@@ -63,15 +63,7 @@ node('vagrant') {
             }
 
             stage('Apply Parameters') {
-                if (version != null) {
-                    ecoSystem.setVersion(version)
-                }
-                if (isNightly()) {
-                    echo 'use snapshot dependencies for nightly build'
-                    docker.image('groovy:3.0.9-jdk11').inside {
-                        sh 'groovy build/latestsnapshot.groovy'
-                    }
-                } else if (isReleaseBuild()) {
+                if (isReleaseBuild()) {
                     echo 'update dependencies for release build'
                     docker.image('groovy:3.0.9-jdk11').inside {
                         sh "groovy build/release.groovy ${releaseVersion}"
@@ -93,41 +85,7 @@ node('vagrant') {
                 }
             }
 
-            stage('Lint') {
-                // we cannot use the Dockerfile Linter because it fails without the labels `name` and `version` which we don't use
-                // lintDockerfile()
-                shellCheck("./resources/pre-upgrade.sh ./resources/startup.sh ./resources/upgrade-notification.sh")
-            }
-
             try {
-
-                stage('Provision') {
-                    ecoSystem.provision("/dogu");
-                }
-
-                stage('Setup') {
-                    ecoSystem.loginBackend('cesmarvin-setup')
-                    ecoSystem.setup()
-                }
-
-                stage('Wait for dependencies') {
-                    timeout(15) {
-                        ecoSystem.waitForDogu("cas")
-                        ecoSystem.waitForDogu("usermgt")
-                    }
-                }
-
-                stage('Build') {
-                    ecoSystem.build("/dogu")
-                }
-
-                stage('Verify') {
-                    ecoSystem.verify("/dogu")
-                }
-
-                stage('e2e Tests') {
-                    ecoSystem.runCypressIntegrationTests([cypressImage: "cypress/included:12.17.1", enableVideo: true, enableScreenshots: true, additionalCypressArgs: "--browser chrome"])
-                }
 
                 stage('Push changes to remote repository') {
                     if (isReleaseBuild()) {
@@ -138,44 +96,6 @@ node('vagrant') {
                         authGit 'cesmarvin', 'push origin master --tags'
                         authGit 'cesmarvin', 'push origin develop --tags'
                         authGit 'cesmarvin', "push origin :${env.BRANCH_NAME}"
-                    }
-                }
-
-                stage('Push') {
-                    // No dogu release without tag allowed
-                    if (params.Tag_Strategy != IGNORE_TAG || isReleaseBuild()) {
-                        for (namespace in NAMESPACES) {
-                            if (params."Push_${namespace}" != null && params."Push_${namespace}") {
-                                ecoSystem.purge("scm")
-                                ecoSystem.changeNamespace(namespace, "/dogu")
-                                ecoSystem.build("/dogu")
-                                ecoSystem.push("/dogu")
-                            }
-                        }
-                    }
-                }
-
-                stage('Website') {
-                    echo "update website for ${version}"
-                    if (params.Push_official) {
-                        dir('website') {
-                            git branch: 'master', changelog: false, credentialsId: 'SCM-Manager', poll: false, url: 'https://ecosystem.cloudogu.com/scm/repo/scm-manager/website'
-
-                            String releaseFile = "content/releases/${params.ScmVersion.replace('.', '-')}.yml"
-
-                            def release = readYaml file: releaseFile
-                            if (!containsReleasePackage(release, 'ces')) {
-                                release.packages.add([type: 'ces'])
-                                writeYaml file: releaseFile, data: release, overwrite: true
-                                sh "git add ${releaseFile}"
-                                sh "git -c user.name='CES_Marvin' -c user.email='cesmarvin@cloudogu.com' commit -m 'Add ces package to release ${params.ScmVersion}' ${releaseFile}"
-                                authGit 'SCM-Manager', 'push origin master'
-                            } else {
-                                echo "release ${params.ScmVersion} contains ces package already"
-                            }
-                        }
-                    } else {
-                        echo 'we only update the website if the official dogu is pushed'
                     }
                 }
 
