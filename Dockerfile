@@ -72,3 +72,4 @@ HEALTHCHECK CMD doguctl healthy scm || exit 1
 
 # start scm
 CMD ["/startup.sh"]
+This has been released
