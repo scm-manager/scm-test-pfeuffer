@@ -7,7 +7,7 @@ def NAMESPACES = ["testing", "official"]
 def IGNORE_TAG = "ignore-tag"
 def BUILD_TAG = "build-existing-tag"
 def TAG_STRATEGIES = [IGNORE_TAG, BUILD_TAG]
-//test1234
+
 Git git = new Git(this, "cesmarvin")
 GitHub github = new GitHub(this, git)
 Changelog changelog = new Changelog(this)
